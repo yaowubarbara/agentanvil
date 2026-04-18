@@ -1,0 +1,95 @@
+# Default values for agentanvil.
+
+# Number of replicas for the trajectory viewer. The UI is stateless and reads
+# from a shared traces volume, so this scales horizontally without coordination.
+replicaCount: 2
+
+image:
+  repository: agentanvil-ui
+  tag: "0.0.2"
+  pullPolicy: IfNotPresent
+
+# Shared persistent volume for trajectory JSONL. Rollout Jobs write to it;
+# the UI Deployment mounts it read-only.
+traces:
+  persistence:
+    enabled: true
+    storageClass: ""  # "" -> use cluster default; set e.g. "standard" for kind
+    size: 1Gi
+    accessMode: ReadWriteMany   # downgrade to ReadWriteOnce on single-node dev
+  mountPath: /data/traces
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3001
+
+# Production-flavored defaults: non-root, read-only rootfs, drop all caps,
+# no escalation. These match the Dockerfile (USER nextjs, uid 1001).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Next.js writes to .next/cache at runtime; give it a writable tmpfs so
+# readOnlyRootFilesystem=true stays honest.
+tmpfs:
+  nextCache: true
+
+livenessProbe:
+  httpGet:
+    path: /api/traces
+    port: 3001
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/traces
+    port: 3001
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 2
+
+# Values consumed by the example rollout Job template.
+rolloutJob:
+  enabled: false    # flip to true, or render separately, to launch on-demand
+  image:
+    repository: agentanvil-harness
+    tag: "0.0.2"
+  timeoutSeconds: 300
+  graceSeconds: 10
+  # Command runs inside the supervisor. Override to point at your task.
+  command: |
+    agentanvil-supervisor run --timeout {{ .Values.rolloutJob.timeoutSeconds }} \
+      --grace {{ .Values.rolloutJob.graceSeconds }} \
+      --socket /tmp/anvil.sock \
+      -- python examples/run_jordan_count.py --task-id task_000
+
+langfuse:
+  # Optional: wire in a Langfuse sidecar or external DNS. Deliberately not
+  # bundling Langfuse as a subchart — we want compat with whichever Langfuse
+  # version the cluster already runs. Leave null to disable.
+  hostUrl: null

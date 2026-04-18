@@ -4,7 +4,7 @@
 
 Plug any agent scaffold (OpenAI Agents SDK, Claude Code, OpenHands, LangChain, custom) into a unified trajectory protocol, run it against verifiable tasks (Jordan Count, OpenHands-bench, your own), observe via Langfuse, replay in a web UI, and — when the time comes — hook into RL frameworks like Agent Lightning without rewriting your agent code.
 
-> **Status: Phase 1 in progress.** Protocol v0.1 formalized ([docs/TRAJECTORY_PROTOCOL.md](docs/TRAJECTORY_PROTOCOL.md)), 4 scaffold adapters (minimal, OpenAI Agents SDK, LangChain, Claude Code headless), schema validator + 11/11 conformance tests green. See [ROADMAP.md](ROADMAP.md).
+> **Status: Phase 2 in progress.** Protocol v0.1 formalized ([docs/TRAJECTORY_PROTOCOL.md](docs/TRAJECTORY_PROTOCOL.md)), 4 scaffold adapters (minimal, OpenAI Agents SDK, LangChain, Claude Code headless), schema validator, 16/16 Python tests + 2/2 Rust unit + 3/3 Rust integration green, Rust sidecar supervisor, Agent Lightning integration stub, Helm chart for K8s. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 
@@ -37,10 +37,10 @@ AgentAnvil's thesis: **one trajectory protocol, many adapters.** If the protocol
            └─────────────────────────────────────────────────────┘
 ```
 
-## Phase 0 Quickstart
+## Quickstart
 
 ```bash
-# 1. Install
+# 1. Install the Python harness
 pip install -e .
 
 # 2. Point at an LLM (Anthropic here; OpenAI variant in examples/)
@@ -58,6 +58,16 @@ ls traces/traces.jsonl        # structured JSONL
 cd ui && npm install && npm run dev
 open http://localhost:3001          # replay viewer
 # Pick two traces ("diff ↔" link), click Compare → /diff?a=...&b=...
+
+# 5. (Optional) Build + run the Rust supervisor for rollouts under timeout enforcement
+cd supervisor && cargo build --release
+./target/release/agentanvil-supervisor run \
+    --timeout 300 --grace 10 \
+    --socket /tmp/anvil.sock \
+    -- python3 ../examples/run_jordan_count.py --task-id task_000
+
+# 6. (Optional) Deploy to a local Kubernetes cluster (kind)
+./deploy/kind-setup.sh    # builds UI image, creates cluster, helm install
 ```
 
 ## Core Design

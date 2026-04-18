@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agentanvil.fullname" . }}
+  labels:
+    {{- include "agentanvil.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agentanvil.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agentanvil.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Rolls pods when ConfigMap changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ui
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "agentanvil.fullname" . }}-config
+          volumeMounts:
+            - name: traces
+              mountPath: {{ .Values.traces.mountPath }}
+              readOnly: true
+            {{- if .Values.tmpfs.nextCache }}
+            - name: next-cache
+              mountPath: /app/.next/cache
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: traces
+          {{- if .Values.traces.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "agentanvil.fullname" . }}-traces
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.tmpfs.nextCache }}
+        - name: next-cache
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+        {{- end }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi

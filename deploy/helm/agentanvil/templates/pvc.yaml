@@ -1,0 +1,17 @@
+{{- if .Values.traces.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "agentanvil.fullname" . }}-traces
+  labels:
+    {{- include "agentanvil.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.traces.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.traces.persistence.size }}
+  {{- if .Values.traces.persistence.storageClass }}
+  storageClassName: {{ .Values.traces.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}

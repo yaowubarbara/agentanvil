@@ -37,15 +37,27 @@
 
 **Goal**: prove the harness is deployable, isolated, and RL-frameworks-ready.
 
-- [ ] Helm chart for K8s (kind / k3d tested)
-- [ ] **Rust sandbox supervisor** (narrow scope, deliberately)
-  - Monitors Python runtime subprocess (PID, cpu, rss)
-  - Enforces wall-clock timeout (SIGTERM → SIGKILL escalation)
-  - Reports status to Python runtime over Unix socket
+- [x] **Rust sidecar supervisor** (narrow scope, enforced)
+  - [x] Monitors Python runtime subprocess (PID + peak RSS)
+  - [x] Enforces wall-clock timeout (SIGTERM → SIGKILL escalation)
+  - [x] Reports status to Python runtime over Unix socket
+  - [x] 2/2 unit tests + 3/3 integration smokes (normal / SIGTERM / SIGKILL)
+  - [x] Python heartbeat client (no-op when AGENTANVIL_SUPER_SOCK unset)
   - **Explicitly NOT in scope**: seccomp profiles, syscall audit, namespace isolation, cgroup policy — these belong to OpenSandbox / gVisor / Firecracker and are out of scope for this supervisor
+- [x] Agent Lightning adapter stub (`agentanvil/adapter/agent_lightning.py`)
+  - [x] `trajectory_to_al_rollout()` flat conversion for outcome-only trainers
+  - [x] `trajectory_to_al_steps()` richer per-step conversion for credit assignment
+  - [x] `ALTrainerStub` for end-to-end testing without the real library
+  - [x] 5/5 tests green
+- [x] Helm chart for K8s (`deploy/helm/agentanvil/`)
+  - [x] Deployment + Service + ConfigMap + PVC + example rollout Job
+  - [x] Production-flavored defaults: runAsNonRoot, readOnlyRootFilesystem, drop ALL caps, seccompProfile=RuntimeDefault
+  - [x] Liveness + readiness probes on `/api/traces`
+  - [x] Multi-stage Dockerfile for the UI (non-root, tmpfs for Next.js cache)
+  - [x] `deploy/kind-setup.sh` one-command local cluster
+  - [x] `helm lint` clean + `helm template` renders
 - [ ] OpenSandbox integration as a runtime backend option
-- [ ] Agent Lightning adapter stub — show the hook surface; do not train
-- [ ] Multi-replica stress demo
+- [ ] Multi-replica stress demo (real cluster)
 
 ## Phase 3 — Differentiated contribution (optional)
 

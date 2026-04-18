@@ -1,0 +1,18 @@
+apiVersion: v2
+name: agentanvil
+description: |
+  Scaffold-agnostic Agent trajectory viewer + rollout runner harness.
+  Deploys the Next.js replay UI and a shared traces volume; rollouts
+  are launched as Kubernetes Jobs (see templates/example-job.yaml).
+type: application
+version: 0.0.1
+appVersion: "0.0.2"
+home: https://github.com/yaowubarbara/agentanvil
+keywords:
+  - ai
+  - agent
+  - llm
+  - observability
+  - evaluation
+maintainers:
+  - name: yaowubarbara

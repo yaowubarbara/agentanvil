@@ -1,0 +1,14 @@
+AgentAnvil {{ .Chart.AppVersion }} installed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+UI:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "agentanvil.fullname" . }} 3001:{{ .Values.service.port }}
+  open http://localhost:3001
+
+Traces volume:
+  kubectl --namespace {{ .Release.Namespace }} get pvc {{ include "agentanvil.fullname" . }}-traces
+
+Launch a rollout on-demand (renders example-job.yaml with your command):
+  helm upgrade {{ .Release.Name }} . --reuse-values --set rolloutJob.enabled=true
+
+Tail logs:
+  kubectl --namespace {{ .Release.Namespace }} logs -l app.kubernetes.io/name={{ include "agentanvil.name" . }} -f

@@ -1,0 +1,55 @@
+{{- if .Values.rolloutJob.enabled }}
+# Example rollout Job — runs the Python harness under the Rust supervisor,
+# writes trajectories into the shared traces PVC that the UI reads.
+#
+# Deliberately a Job (not a CronJob): rollouts are on-demand, driven by the
+# algo team's training loop. For recurring evals, wrap this in a CronJob.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "agentanvil.fullname" . }}-rollout-{{ now | date "20060102-150405" }}
+  labels:
+    {{- include "agentanvil.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rollout
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: rollout
+          image: "{{ .Values.rolloutJob.image.repository }}:{{ .Values.rolloutJob.image.tag }}"
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "agentanvil.fullname" . }}-config
+          env:
+            - name: TRACES_PATH
+              value: "{{ .Values.traces.mountPath }}/traces.jsonl"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              {{- tpl .Values.rolloutJob.command . | nindent 14 }}
+          volumeMounts:
+            - name: traces
+              mountPath: {{ .Values.traces.mountPath }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: traces
+          {{- if .Values.traces.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "agentanvil.fullname" . }}-traces
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}
