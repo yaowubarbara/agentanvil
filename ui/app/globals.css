@@ -1,0 +1,61 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: #0b0d12;
+  color: #dfe3ea;
+  font-size: 13px;
+  line-height: 1.55;
+}
+a { color: #7cc4ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+pre { white-space: pre-wrap; word-break: break-word; }
+
+.layout { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+.sidebar {
+  border-right: 1px solid #1a1f2a;
+  padding: 16px 12px;
+  background: #0e1117;
+  overflow-y: auto;
+  max-height: 100vh;
+}
+.sidebar h1 { font-size: 14px; margin-bottom: 12px; color: #fff; letter-spacing: 0.5px; }
+.sidebar .item {
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.sidebar .item:hover { background: #141923; }
+.sidebar .item.active { background: #1a2235; border-color: #2d3b5a; }
+.sidebar .item .meta { color: #6c7687; font-size: 11px; margin-top: 2px; }
+.sidebar .item .reward-ok { color: #6fcf97; }
+.sidebar .item .reward-bad { color: #eb5757; }
+
+.main { padding: 24px; overflow-y: auto; max-height: 100vh; }
+.header { margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #1a1f2a; }
+.header h2 { color: #fff; font-size: 15px; margin-bottom: 6px; }
+.header .sub { color: #6c7687; font-size: 11px; }
+
+.event {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #2d3b5a;
+  background: #10141c;
+  border-radius: 0 4px 4px 0;
+}
+.event.observation  { border-color: #7cc4ff; }
+.event.thought      { border-color: #a78bfa; }
+.event.tool_call    { border-color: #f0b54d; }
+.event.tool_result  { border-color: #f0b54d; opacity: 0.85; }
+.event.final_answer { border-color: #6fcf97; }
+.event.reward       { border-color: #eb5757; }
+.event.error        { border-color: #eb5757; background: #1a1012; }
+.event .kind {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: #8b96ab; margin-bottom: 4px;
+}
+.event .content { font-size: 12px; color: #dfe3ea; }
+.event .step { color: #6c7687; font-size: 10px; float: right; }
+
+.empty { color: #6c7687; padding: 24px; text-align: center; }

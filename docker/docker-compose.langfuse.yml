@@ -1,0 +1,44 @@
+# Langfuse self-hosted — minimal stack for local dev.
+#
+# Usage:
+#   cd docker
+#   cp .env.langfuse.example .env
+#   # edit secrets
+#   docker compose -f docker-compose.langfuse.yml up -d
+#   # then set in your shell:
+#   export LANGFUSE_HOST=http://localhost:3000
+#   export LANGFUSE_PUBLIC_KEY=...   # from UI Settings > API Keys
+#   export LANGFUSE_SECRET_KEY=...
+#
+# Phase 0: single-node v2 image for simplicity. Phase 1 may move to v3
+# (requires Clickhouse + Redis) if we want production-grade tracing.
+
+services:
+  langfuse-db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-langfuse}
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse_db:/var/lib/postgresql/data
+
+  langfuse-web:
+    image: langfuse/langfuse:2
+    depends_on:
+      - langfuse-db
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://langfuse:${POSTGRES_PASSWORD:-langfuse}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-changeme-in-env-file}
+      SALT: ${SALT:-changeme-in-env-file}
+      NEXTAUTH_URL: http://localhost:3000
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_INIT_ORG_ID: anvil
+      LANGFUSE_INIT_PROJECT_ID: default
+    restart: unless-stopped
+
+volumes:
+  langfuse_db:

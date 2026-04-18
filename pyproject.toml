@@ -1,0 +1,37 @@
+[project]
+name = "agentanvil"
+version = "0.0.1"
+description = "Scaffold-agnostic Agent training & evaluation harness"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "yaowubarbara" }]
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.60", "openai-agents>=0.1"]
+langfuse = ["langfuse>=2.0"]
+jordan = ["numpy", "pillow", "shapely"]
+dev = ["pytest", "ruff", "mypy"]
+all = [
+    "anthropic>=0.40",
+    "openai>=1.60",
+    "openai-agents>=0.1",
+    "langfuse>=2.0",
+    "numpy",
+    "pillow",
+    "shapely",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["agentanvil*"]
+
+[tool.ruff]
+line-length = 100
