@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type EventKind =
   | "observation"
@@ -31,6 +32,7 @@ type Trajectory = {
     reward: number;
     parsed: unknown;
     gold: unknown;
+    meta?: Record<string, unknown>;
   };
 };
 
@@ -49,8 +51,11 @@ function shortTime(ts: number) {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [trajs, setTrajs] = useState<Trajectory[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [pickA, setPickA] = useState<string | null>(null);
+  const [pickB, setPickB] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,20 +70,54 @@ export default function Home() {
       .catch((e) => setError(String(e)));
   }, []);
 
+  function togglePick(id: string) {
+    if (pickA === id) {
+      setPickA(null);
+    } else if (pickB === id) {
+      setPickB(null);
+    } else if (!pickA) {
+      setPickA(id);
+    } else if (!pickB) {
+      setPickB(id);
+    }
+  }
+
+  function pickLabel(id: string): string {
+    if (pickA === id) return "A ✓";
+    if (pickB === id) return "B ✓";
+    return "diff ↔";
+  }
+
   const current = trajs.find((t) => t.trajectory_id === selected);
+  const canCompare = pickA && pickB && pickA !== pickB;
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <h1>AgentAnvil · traces</h1>
+        <div className="diff-bar">
+          <div>
+            Diff mode:{" "}
+            <span className="chosen">A={pickA ? pickA.slice(0, 8) : "—"}</span>{" "}
+            <span className="chosen">B={pickB ? pickB.slice(0, 8) : "—"}</span>
+          </div>
+          <button
+            disabled={!canCompare}
+            onClick={() => router.push(`/diff?a=${pickA}&b=${pickB}`)}
+          >
+            Compare →
+          </button>
+        </div>
         {error && <div className="empty">Error: {error}</div>}
         {!error && trajs.length === 0 && (
           <div className="empty">
-            No traces yet. Run <code>examples/run_jordan_count.py</code>.
+            No traces. Run <code>examples/seed_demo_traces.py</code> or{" "}
+            <code>examples/run_jordan_count.py</code>.
           </div>
         )}
         {trajs.map((t) => {
           const ok = t.verify?.correct;
+          const isPicked = pickA === t.trajectory_id || pickB === t.trajectory_id;
           return (
             <div
               key={t.trajectory_id}
@@ -97,6 +136,15 @@ export default function Home() {
                   </>
                 )}
               </div>
+              <span
+                className={`diff-pick ${isPicked ? "picked" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePick(t.trajectory_id);
+                }}
+              >
+                {pickLabel(t.trajectory_id)}
+              </span>
             </div>
           );
         })}

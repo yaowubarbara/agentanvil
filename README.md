@@ -49,10 +49,15 @@ export ANTHROPIC_API_KEY=...
 # 3. Run one Jordan Count problem end-to-end
 python examples/run_jordan_count.py --task-id task_000
 
-# 4. View the trace
+# Or: seed a pair of contrasting traces (claude-code correct vs minimal overcount)
+#     for the diff UI, without burning any API credit
+python examples/seed_demo_traces.py
+
+# 4. View the trace(s)
 ls traces/traces.jsonl        # structured JSONL
 cd ui && npm install && npm run dev
-open http://localhost:3000
+open http://localhost:3001          # replay viewer
+# Pick two traces ("diff ↔" link), click Compare → /diff?a=...&b=...
 ```
 
 ## Core Design

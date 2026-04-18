@@ -26,9 +26,10 @@
 - [x] LangChain adapter (tool loop via `intermediate_steps`)
 - [x] Claude Code adapter (headless CLI + `stream-json` stream parser + `from_stream()` replay)
 - [x] 11/11 conformance tests (4 scaffolds positive + 7 negative + Claude Code stream-mapping spot check)
+- [x] Diff UI: side-by-side step-aligned replay with divergence highlighting; sidebar pick-A/pick-B selector
+- [x] `examples/seed_demo_traces.py`: dependency-free demo fixture (claude-code correct vs minimal overcount on the same task_id)
 - [ ] OpenHands adapter
 - [ ] Claude Agent SDK variant (second Claude Code integration path)
-- [ ] Diff UI: run two scaffolds on the same task, side-by-side replay
 - [ ] OpenHands-bench verifier (subset)
 - [ ] Langfuse sink hardened (prompt cache, latency, token accounting)
 
