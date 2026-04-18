@@ -21,10 +21,12 @@
 
 **Goal**: prove the protocol survives contact with 3+ scaffolds, publish a versioned spec.
 
+- [x] `docs/TRAJECTORY_PROTOCOL.md` — v0.1 spec (event schema, tool-call normalization, MUST rules)
+- [x] `agentanvil/schema.py` — runtime validator for the MUST rules
+- [x] LangChain adapter (tool loop via `intermediate_steps`)
+- [x] 10/10 conformance tests (3 scaffolds positive + 7 negative)
 - [ ] Claude Code adapter (headless subprocess / SDK)
 - [ ] OpenHands adapter
-- [ ] LangChain adapter
-- [ ] `docs/TRAJECTORY_PROTOCOL.md` — v0.1 spec (event schema, JSON schema, tool-call normalization)
 - [ ] Diff UI: run two scaffolds on the same task, side-by-side replay
 - [ ] OpenHands-bench verifier (subset)
 - [ ] Langfuse sink hardened (prompt cache, latency, token accounting)
