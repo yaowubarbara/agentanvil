@@ -19,6 +19,7 @@ from agentanvil import AnvilAgent, AnvilTask
 from agentanvil.trajectory import EventKind, Trajectory
 from agentanvil.schema import is_compliant, validate, PROTOCOL_VERSION
 from agentanvil.adapter.langchain import from_callable as lc_from_callable
+from agentanvil.adapter.claude_code import ClaudeCodeAdapter
 
 
 class _Task(AnvilTask):
@@ -80,6 +81,12 @@ def _synth_langchain() -> Trajectory:
     return adapter.run(_Task("suite/lc_000"))
 
 
+def _synth_claude_code() -> Trajectory:
+    """Claude Code: parse a recorded stream-json fixture into a trajectory."""
+    fixture = Path(__file__).parent / "fixtures" / "claude_code_sample.jsonl"
+    return ClaudeCodeAdapter.from_stream(fixture, task_id="suite/cc_000")
+
+
 def _all_good(name, traj):
     issues = validate(traj)
     assert not issues, f"{name} failed conformance: {[str(i) for i in issues]}"
@@ -88,10 +95,33 @@ def _all_good(name, traj):
     json.loads(json.dumps(traj.to_json()))
 
 
-def test_three_scaffolds_conform():
+def test_four_scaffolds_conform():
     _all_good("minimal", _synth_minimal())
     _all_good("openai-agents-sdk", _synth_openai_agents())
     _all_good("langchain", _synth_langchain())
+    _all_good("claude-code", _synth_claude_code())
+
+
+def test_claude_code_stream_mapping():
+    """Spot-check the stream-json → unified events mapping."""
+    traj = _synth_claude_code()
+    kinds = [e.kind.value for e in traj.events]
+    # Expected shape from fixture:
+    # [observation, thought(thinking), tool_call, tool_result, thought(text), final_answer]
+    assert kinds[0] == "observation"
+    assert "thought" in kinds
+    assert "tool_call" in kinds
+    assert "tool_result" in kinds
+    assert kinds[-1] == "final_answer"
+    # Call ID propagation: tool_call.call_id must equal tool_result.call_id
+    tc = next(e for e in traj.events if e.kind == EventKind.TOOL_CALL)
+    tr = next(e for e in traj.events if e.kind == EventKind.TOOL_RESULT)
+    assert tc.content["call_id"] == tr.content["call_id"] == "toolu_01"
+    # Final answer must be strict-parseable by Jordan Count verifier
+    from agentanvil.verifier.jordan_count import JordanCountVerifier
+    assert JordanCountVerifier().parse(traj.final_answer()) == 3
+    # Session ID captured from system/init event
+    assert traj.meta.get("claude_session_id") == "session_abc123"
 
 
 def test_negative_empty_events():

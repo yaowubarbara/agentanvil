@@ -4,7 +4,7 @@
 
 Plug any agent scaffold (OpenAI Agents SDK, Claude Code, OpenHands, LangChain, custom) into a unified trajectory protocol, run it against verifiable tasks (Jordan Count, OpenHands-bench, your own), observe via Langfuse, replay in a web UI, and — when the time comes — hook into RL frameworks like Agent Lightning without rewriting your agent code.
 
-> **Status: Phase 1 in progress.** Protocol v0.1 formalized ([docs/TRAJECTORY_PROTOCOL.md](docs/TRAJECTORY_PROTOCOL.md)), 3 scaffold adapters (minimal, OpenAI Agents SDK, LangChain), schema validator + 10/10 conformance tests green. See [ROADMAP.md](ROADMAP.md).
+> **Status: Phase 1 in progress.** Protocol v0.1 formalized ([docs/TRAJECTORY_PROTOCOL.md](docs/TRAJECTORY_PROTOCOL.md)), 4 scaffold adapters (minimal, OpenAI Agents SDK, LangChain, Claude Code headless), schema validator + 11/11 conformance tests green. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 
@@ -95,7 +95,7 @@ class Verifier(ABC):
 | Minimal (direct LLM)| 0     | ✅ skeleton |
 | OpenAI Agents SDK   | 0     | ✅ skeleton |
 | LangChain           | 1     | ✅ (tool loop via `intermediate_steps`) |
-| Claude Code         | 1     | planned (next) |
+| Claude Code         | 1     | ✅ (headless CLI + `stream-json` parser; `from_stream()` for dep-free replay) |
 | OpenHands           | 1     | planned   |
 | Agent Lightning     | 2     | adapter stub for RL wiring |
 
