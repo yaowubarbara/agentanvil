@@ -115,10 +115,31 @@ function DiffPageInner() {
   if (error) return <div className="empty">Error: {error}</div>;
   if (!a || !b) {
     return (
-      <div className="empty">
-        Diff view requires two trajectory_ids:
-        <pre>/diff?a=&lt;traj_id_1&gt;&amp;b=&lt;traj_id_2&gt;</pre>
-        <a href="/">← back to trace list</a>
+      <div className="diff-empty">
+        <div className="diff-empty-icon">⇔</div>
+        <h2 className="diff-empty-title">Pick two trajectories to compare</h2>
+        <p className="diff-empty-sub">
+          The diff view shows two runs side-by-side with divergent steps
+          highlighted. You need to choose which two to compare first.
+        </p>
+        <div className="diff-empty-steps">
+          <div className="diff-empty-step">
+            <span className="step-num">1</span>
+            <span>Open the <a href="/traces">Traces</a> list</span>
+          </div>
+          <div className="diff-empty-step">
+            <span className="step-num">2</span>
+            <span>Click the <code>pick</code> button on any two rows (they flip to A / B)</span>
+          </div>
+          <div className="diff-empty-step">
+            <span className="step-num">3</span>
+            <span>Click <code>Compare →</code> to land back here with data</span>
+          </div>
+        </div>
+        <div className="diff-empty-actions">
+          <a href="/traces" className="cta-btn">Go to Traces →</a>
+          <a href="/" className="cta-btn secondary">← Dashboard</a>
+        </div>
       </div>
     );
   }
