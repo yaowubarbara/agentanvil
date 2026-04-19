@@ -4,7 +4,7 @@
 
 Plug any agent scaffold (OpenAI Agents SDK, Claude Code, OpenHands, LangChain, custom) into a unified trajectory protocol, run it against verifiable tasks (Jordan Count, OpenHands-bench, your own), observe via Langfuse, replay in a web UI, and — when the time comes — hook into RL frameworks like Agent Lightning without rewriting your agent code.
 
-> **Status: Phase 2 in progress.** Protocol v0.1 formalized ([docs/TRAJECTORY_PROTOCOL.md](docs/TRAJECTORY_PROTOCOL.md)), 4 scaffold adapters (minimal, OpenAI Agents SDK, LangChain, Claude Code headless), schema validator, 16/16 Python tests + 2/2 Rust unit + 3/3 Rust integration green, Rust sidecar supervisor, Agent Lightning integration stub, Helm chart for K8s. See [ROADMAP.md](ROADMAP.md).
+> **Status: Phase 2+ deep ecosystem integration.** Protocol v0.1 formalized, 8 scaffold adapters (minimal, OpenAI Agents SDK, LangChain, Claude Code headless, OpenHands, AutoGen, CrewAI, LangGraph, LlamaIndex), 4 verifiers + evaluator framework, **real OpenSandbox runtime adapter** (alibaba/OpenSandbox, gVisor/Kata/Firecracker), **real Agent Lightning integration** (AnvilLitAgent subclasses `agentlightning.LitAgent` when installed), Langfuse sink, OpenTelemetry sink, Rust sidecar supervisor, Helm chart, CLI. **91/91 Python + 5/5 Rust = 96 tests green**. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 

@@ -1,26 +1,34 @@
 """
-Agent Lightning integration surface — STUB.
+Agent Lightning integration (real + stub, auto-selected).
 
-Scope statement (important):
-    This module demonstrates the *integration contract* between AgentAnvil and
-    an RL trainer. It does NOT run training. The platform-engineer role this
-    project targets is "build the harness so the algo team can plug in their
-    trainer" — not "train the model ourselves". Every function here is either:
-      (a) a conversion between AgentAnvil's Trajectory/VerifyResult and the
-          rollout shape a trainer consumes, OR
-      (b) a stand-in "trainer" that accepts rollouts and reports statistics,
-          so the pipeline is testable end-to-end without installing the real
-          agent-lightning package.
+Agent Lightning (Microsoft Research, 2025) is the "PyTorch Lightning" of agent
+RL — you subclass a LitAgent, implement a rollout method, and hand the class
+to a Trainer that drives batches of tasks, collects (prompt, response, reward)
+tuples, and runs policy optimization.
 
-When the real agent-lightning library is installed, replace:
-    ALRollout              -> agent_lightning.Rollout
-    ALTrainerStub.consume  -> trainer.training_step
-The conversion functions remain unchanged — that's the point of the surface.
+This module provides:
+
+  1. Conversion functions                (trajectory → rollout shapes)
+  2. AnvilLitAgent (stub-friendly)       — works without agent-lightning
+  3. build_lit_agent()                   — returns a real LitAgent subclass
+                                           when agent-lightning is importable,
+                                           otherwise returns AnvilLitAgent
+  4. train_with_agent_lightning()        — one-liner to actually run training
+  5. ALTrainerStub                       — in-repo fake trainer for tests
+
+So: if `pip install agent-lightning` is done, calling train_with_agent_lightning()
+kicks off a real training loop with our AnvilAgents as policies. If it's not
+installed, AnvilLitAgent + ALTrainerStub cover the full pipeline for tests and
+for teams that aren't running RL yet.
+
+Design note: the harness is not an RL trainer. We do NOT try to implement
+policy gradient / PPO / etc. here. We implement the INTEGRATION CONTRACT —
+the shape of data agent-lightning (or any similar trainer) consumes.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional, Sequence
 
 from ..trajectory import EventKind, Trajectory
 from ..verifier.base import VerifyResult
@@ -145,3 +153,138 @@ class ALTrainerStub:
                 for sc in {r.scaffold for r in self.rollouts}
             },
         }
+
+
+# ── Real Agent Lightning integration ────────────────────────────────
+
+class AnvilLitAgent:
+    """A LitAgent-shaped object bound to AgentAnvil components.
+
+    When agent-lightning is NOT installed, this class can stand on its own —
+    it still produces rollouts via its `rollout()` method and can be driven
+    by ALTrainerStub. When agent-lightning IS installed, `build_lit_agent()`
+    returns a subclass of `agentlightning.LitAgent` that delegates to this
+    class, so the same rollout logic is used in both paths.
+
+    Method contract (what a real Agent Lightning Trainer calls):
+      - rollout(task) -> ALRollout        # per-task rollout
+      - training_step(batch) -> list[ALRollout]  # batched rollout
+      - validation_step(batch) -> list[ALRollout]
+    """
+
+    def __init__(
+        self,
+        anvil_agent,
+        verifier,
+        scaffold_hint: Optional[str] = None,
+    ):
+        self.anvil_agent = anvil_agent
+        self.verifier = verifier
+        self.scaffold_hint = scaffold_hint or getattr(anvil_agent, "scaffold_name", "unknown")
+        self._rollout_count = 0
+
+    def rollout(self, task) -> ALRollout:
+        traj = self.anvil_agent.run(task)
+        final = traj.final_answer() or ""
+        vr = self.verifier.verify(final, task)
+        vr.meta.setdefault("verifier", getattr(self.verifier, "name", "unknown"))
+        self._rollout_count += 1
+        # Emit a REWARD event on the trajectory so the trace carries the
+        # reward signal too — matches what agentanvil.runner.run_one does.
+        traj.emit(
+            EventKind.REWARD,
+            {
+                "reward": vr.reward,
+                "correct": vr.correct,
+                "parsed": vr.parsed,
+                "gold": vr.gold,
+                "verifier": vr.meta.get("verifier"),
+            },
+        )
+        rollout = trajectory_to_al_rollout(traj, vr)
+        rollout.meta["trajectory"] = traj.to_json()  # attach full trace for trainers that want it
+        rollout.meta["rollout_idx"] = self._rollout_count
+        return rollout
+
+    def training_step(self, batch: Sequence) -> list[ALRollout]:
+        return [self.rollout(t) for t in batch]
+
+    def validation_step(self, batch: Sequence) -> list[ALRollout]:
+        return [self.rollout(t) for t in batch]
+
+
+def build_lit_agent(anvil_agent, verifier, scaffold_hint: Optional[str] = None):
+    """Build an Agent Lightning `LitAgent` subclass bound to AgentAnvil.
+
+    If agent-lightning is installed, returns a real `agentlightning.LitAgent`
+    subclass that delegates to AnvilLitAgent. If not, returns AnvilLitAgent
+    directly — same interface, same behavior, just not a subclass of the
+    real base.
+    """
+    inner = AnvilLitAgent(anvil_agent, verifier, scaffold_hint=scaffold_hint)
+    try:
+        from agentlightning import LitAgent  # type: ignore
+    except ImportError:
+        return inner
+
+    class _AnvilBackedLitAgent(LitAgent):   # type: ignore[misc]
+        def __init__(self):
+            super().__init__()
+            self._inner = inner
+
+        def rollout(self, task):
+            return self._inner.rollout(task)
+
+        def training_step(self, batch, batch_idx=None):
+            return self._inner.training_step(batch)
+
+        def validation_step(self, batch, batch_idx=None):
+            return self._inner.validation_step(batch)
+
+    return _AnvilBackedLitAgent()
+
+
+def train_with_agent_lightning(
+    anvil_agent,
+    verifier,
+    dataset,
+    max_epochs: int = 1,
+    batch_size: int = 4,
+    trainer_kwargs: Optional[dict] = None,
+    fallback_to_stub: bool = True,
+):
+    """Run a real Agent Lightning training loop over an AgentAnvil dataset.
+
+    If agent-lightning is installed, uses their Trainer + TaskLoader. If not
+    and `fallback_to_stub=True`, runs through ALTrainerStub so the pipeline
+    still exercises end-to-end; returns the stub trainer with aggregated stats.
+
+    Returns: the (real or stub) trainer, the lit_agent, and (for real runs)
+    any fit metrics agent-lightning surfaces.
+    """
+    lit_agent = build_lit_agent(anvil_agent, verifier)
+
+    try:
+        from agentlightning import Trainer as ALTrainer  # type: ignore
+        from agentlightning import TaskLoader  # type: ignore
+    except ImportError:
+        if not fallback_to_stub:
+            raise ImportError(
+                "pip install agent-lightning, or pass fallback_to_stub=True"
+            )
+        stub = ALTrainerStub()
+        tasks = list(dataset.tasks) if hasattr(dataset, "tasks") else list(dataset)
+        for epoch in range(max_epochs):
+            for i in range(0, len(tasks), batch_size):
+                batch = tasks[i : i + batch_size]
+                for r in lit_agent.training_step(batch):
+                    stub.consume(r)
+        return {"trainer": stub, "lit_agent": lit_agent, "report": stub.report(), "path": "stub"}
+
+    kwargs = dict(trainer_kwargs or {})
+    kwargs.setdefault("max_epochs", max_epochs)
+    trainer = ALTrainer(**kwargs)
+    tasks = list(dataset.tasks) if hasattr(dataset, "tasks") else list(dataset)
+    loader = TaskLoader(tasks, batch_size=batch_size)
+    trainer.fit(lit_agent, loader)
+    return {"trainer": trainer, "lit_agent": lit_agent, "report": None, "path": "real"}

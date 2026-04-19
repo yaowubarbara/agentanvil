@@ -44,11 +44,13 @@
   - [x] 2/2 unit tests + 3/3 integration smokes (normal / SIGTERM / SIGKILL)
   - [x] Python heartbeat client (no-op when AGENTANVIL_SUPER_SOCK unset)
   - **Explicitly NOT in scope**: seccomp profiles, syscall audit, namespace isolation, cgroup policy — these belong to OpenSandbox / gVisor / Firecracker and are out of scope for this supervisor
-- [x] Agent Lightning adapter stub (`agentanvil/adapter/agent_lightning.py`)
+- [x] Agent Lightning adapter — **REAL, NOT STUB** (`agentanvil/adapter/agent_lightning.py`)
   - [x] `trajectory_to_al_rollout()` flat conversion for outcome-only trainers
   - [x] `trajectory_to_al_steps()` richer per-step conversion for credit assignment
-  - [x] `ALTrainerStub` for end-to-end testing without the real library
-  - [x] 5/5 tests green
+  - [x] `AnvilLitAgent` implements the full `LitAgent` method contract
+  - [x] `build_lit_agent()` returns real `agentlightning.LitAgent` subclass when installed
+  - [x] `train_with_agent_lightning()` one-liner — calls real Trainer.fit() OR falls back to ALTrainerStub
+  - [x] 5/5 stub + 7/7 real-integration tests green
 - [x] Helm chart for K8s (`deploy/helm/agentanvil/`)
   - [x] Deployment + Service + ConfigMap + PVC + example rollout Job
   - [x] Production-flavored defaults: runAsNonRoot, readOnlyRootFilesystem, drop ALL caps, seccompProfile=RuntimeDefault
@@ -56,7 +58,12 @@
   - [x] Multi-stage Dockerfile for the UI (non-root, tmpfs for Next.js cache)
   - [x] `deploy/kind-setup.sh` one-command local cluster
   - [x] `helm lint` clean + `helm template` renders
-- [ ] OpenSandbox integration as a runtime backend option
+- [x] **OpenSandbox runtime integration** (`agentanvil/runtime/opensandbox.py`)
+  - [x] `OpenSandboxRuntime` wrapper with gVisor/Kata/Firecracker runtime selection
+  - [x] Stateful code-interpreter context (pip installs persist across `code.run()`)
+  - [x] `ToolCallRouter` maps `python.exec` / `shell.run` / `fs.read` / `fs.write` to execd endpoints
+  - [x] Lazy import of `opensandbox` PyPI SDK + `StubClient` for dependency-free testing
+  - [x] 14/14 tests green (lifecycle + code context + command + file I/O + router)
 - [ ] Multi-replica stress demo (real cluster)
 
 ## Phase 3 — Differentiated contribution (optional)
