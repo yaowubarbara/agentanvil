@@ -1,0 +1,7 @@
+name: simple-qa-mini
+verifier: agentanvil.verifier.gsm8k.GSM8KVerifier
+task_class: agentanvil.verifier.gsm8k.GSM8KTask
+version: 0.1.0
+license: MIT
+source: hand-authored short-answer factual pack
+description: 10 factual short-answer questions. Uses GSM8K verifier's numeric answer parser.

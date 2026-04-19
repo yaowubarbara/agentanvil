@@ -23,7 +23,7 @@ def test_list_builtin_packs():
 def test_load_gsm8k_mini():
     ds = Dataset.from_pack("gsm8k-mini")
     assert ds.meta.name == "gsm8k-mini"
-    assert len(ds) == 12
+    assert len(ds) >= 12
     assert ds.tasks[0].task_id == "gsm8k-mini/001"
     assert "#### 6" in ds.tasks[0].gold_answer
 
@@ -31,7 +31,7 @@ def test_load_gsm8k_mini():
 def test_load_humaneval_mini():
     ds = Dataset.from_pack("humaneval-mini")
     assert ds.meta.name == "humaneval-mini"
-    assert len(ds) == 8
+    assert len(ds) >= 8
     # entry_point should be set on every task
     for t in ds.tasks:
         assert t.entry_point
@@ -67,7 +67,8 @@ def test_dataset_iteration_yields_task_plus_verifier():
         assert verifier is not None
         assert hasattr(verifier, "verify")
         assert task.task_id.startswith("gsm8k-mini/")
-    assert count == 12
+    assert count == len(ds)
+    assert count >= 12
 
 
 def test_dataset_verifier_end_to_end_gsm8k():

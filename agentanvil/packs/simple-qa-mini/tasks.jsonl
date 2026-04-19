@@ -1,0 +1,10 @@
+{"task_id": "simple-qa/001", "question": "How many days are in a leap year?", "gold_answer": "#### 366"}
+{"task_id": "simple-qa/002", "question": "How many bones are in an adult human body?", "gold_answer": "#### 206"}
+{"task_id": "simple-qa/003", "question": "How many sides does a hexagon have?", "gold_answer": "#### 6"}
+{"task_id": "simple-qa/004", "question": "How many continents are there?", "gold_answer": "#### 7"}
+{"task_id": "simple-qa/005", "question": "How many countries are in the European Union?", "gold_answer": "#### 27"}
+{"task_id": "simple-qa/006", "question": "How many US states are there?", "gold_answer": "#### 50"}
+{"task_id": "simple-qa/007", "question": "In what year did World War II end?", "gold_answer": "#### 1945"}
+{"task_id": "simple-qa/008", "question": "How many chromosomes do humans have?", "gold_answer": "#### 46"}
+{"task_id": "simple-qa/009", "question": "How many planets are in our solar system?", "gold_answer": "#### 8"}
+{"task_id": "simple-qa/010", "question": "How many hours in a week?", "gold_answer": "#### 168"}
