@@ -43,19 +43,6 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (!mounted) {
-    return (
-      <main className="dashboard" suppressHydrationWarning>
-        <section className="hero">
-          <h1 className="hero-title">
-            <span className="hero-gradient">Agent evaluation</span> at a glance
-          </h1>
-          <p className="hero-sub">initializing…</p>
-        </section>
-      </main>
-    );
-  }
-
   const stats = useMemo(() => {
     const byScaffold = new Map<string, { n: number; correct: number; rewards: number[] }>();
     const byTask = new Map<string, number>();
@@ -99,7 +86,20 @@ export default function Dashboard() {
     };
   }, [trajs]);
 
-  const recent = trajs.slice(0, 6);
+  const recent = useMemo(() => trajs.slice(0, 6), [trajs]);
+
+  if (!mounted) {
+    return (
+      <main className="dashboard" suppressHydrationWarning>
+        <section className="hero">
+          <h1 className="hero-title">
+            <span className="hero-gradient">Agent evaluation</span> at a glance
+          </h1>
+          <p className="hero-sub">initializing…</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="dashboard">

@@ -56,6 +56,13 @@ export default function TraceDetail() {
       .catch((e) => setErr(String(e)));
   }, [id]);
 
+  const durationMs = useMemo(() => {
+    if (!traj) return 0;
+    const end =
+      traj.finished_at ?? (traj.events.length > 0 ? traj.events[traj.events.length - 1].ts : traj.started_at);
+    return Math.round((end - traj.started_at) * 1000);
+  }, [traj]);
+
   if (!mounted) {
     return (
       <main className="trace-page" suppressHydrationWarning>
@@ -63,13 +70,6 @@ export default function TraceDetail() {
       </main>
     );
   }
-
-  const durationMs = useMemo(() => {
-    if (!traj) return 0;
-    return Math.round(
-      ((traj.finished_at ?? Date.now() / 1000) - traj.started_at) * 1000
-    );
-  }, [traj]);
 
   if (err) {
     return (
