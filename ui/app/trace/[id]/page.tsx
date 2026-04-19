@@ -37,11 +37,13 @@ function renderContent(c: unknown): string {
 export default function TraceDetail() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
+  const [mounted, setMounted] = useState(false);
   const [traj, setTraj] = useState<Trajectory | null>(null);
   const [step, setStep] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     fetch("/api/traces")
       .then((r) => r.json())
       .then((d) => {
@@ -53,6 +55,14 @@ export default function TraceDetail() {
       })
       .catch((e) => setErr(String(e)));
   }, [id]);
+
+  if (!mounted) {
+    return (
+      <main className="trace-page" suppressHydrationWarning>
+        <div className="empty-chart">Loading trajectory…</div>
+      </main>
+    );
+  }
 
   const durationMs = useMemo(() => {
     if (!traj) return 0;

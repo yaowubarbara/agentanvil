@@ -24,15 +24,37 @@ function shortTime(ts: number) {
 }
 
 export default function Dashboard() {
+  const [mounted, setMounted] = useState(false);
   const [trajs, setTrajs] = useState<Trajectory[]>([]);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [apiSource, setApiSource] = useState<string | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     fetch("/api/traces")
       .then((r) => r.json())
-      .then((d) => setTrajs(d.trajectories || []))
-      .catch((e) => setErr(String(e)));
+      .then((d) => {
+        setTrajs(d.trajectories || []);
+        setApiSource(d.source || null);
+        if (d.error) setErr(String(d.error));
+      })
+      .catch((e) => setErr(String(e)))
+      .finally(() => setLoading(false));
   }, []);
+
+  if (!mounted) {
+    return (
+      <main className="dashboard" suppressHydrationWarning>
+        <section className="hero">
+          <h1 className="hero-title">
+            <span className="hero-gradient">Agent evaluation</span> at a glance
+          </h1>
+          <p className="hero-sub">initializing…</p>
+        </section>
+      </main>
+    );
+  }
 
   const stats = useMemo(() => {
     const byScaffold = new Map<string, { n: number; correct: number; rewards: number[] }>();
@@ -81,7 +103,23 @@ export default function Dashboard() {
 
   return (
     <main className="dashboard">
-      {err && <div className="banner err">Error loading traces: {err}</div>}
+      {err && (
+        <div className="banner err">
+          Error loading traces: {err}
+          {apiSource && <div className="banner-sub">source: {apiSource}</div>}
+        </div>
+      )}
+      {loading && !err && (
+        <div className="banner info">Loading trajectories…</div>
+      )}
+      {!loading && !err && trajs.length === 0 && (
+        <div className="banner warn">
+          <strong>No trajectories yet.</strong> Run{" "}
+          <code>python3 examples/seed_demo_traces.py</code> or{" "}
+          <code>aa eval run gsm8k-mini</code> to populate{" "}
+          <code>{apiSource || "traces/traces.jsonl"}</code>.
+        </div>
+      )}
 
       <section className="hero">
         <h1 className="hero-title">
@@ -90,6 +128,9 @@ export default function Dashboard() {
         <p className="hero-sub">
           Scaffold-agnostic trajectory observability for {stats.taskCount || 0} tasks across{" "}
           {stats.scaffolds.length} scaffold{stats.scaffolds.length === 1 ? "" : "s"}.
+          {apiSource && (
+            <span className="hero-source"> · source: <code>{apiSource}</code></span>
+          )}
         </p>
       </section>
 

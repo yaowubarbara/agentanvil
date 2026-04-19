@@ -56,16 +56,11 @@ export default function AccuracyBarChart({ data, height = 260 }: Props) {
               height={barH}
               rx={3}
               fill={`url(#${gradId})`}
-              className="chart-bar"
-            >
-              <animate
-                attributeName="width"
-                from="0"
-                to={w}
-                dur="0.6s"
-                fill="freeze"
-              />
-            </rect>
+              className="chart-bar chart-bar-animated"
+              style={{
+                transformOrigin: `${labelW}px ${y}px`,
+              }}
+            />
             <text
               x={labelW + chartW + 8}
               y={y + barH * 0.68}
