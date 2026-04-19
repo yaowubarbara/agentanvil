@@ -103,6 +103,24 @@ export default function Dashboard() {
 
   return (
     <main className="dashboard">
+      {/* Debug panel — always visible so you can see fetch state at a glance. */}
+      <div className="debug-panel">
+        <div><b>DEBUG</b></div>
+        <div>mounted: <code>{String(mounted)}</code></div>
+        <div>loading: <code>{String(loading)}</code></div>
+        <div>trajs.length: <code>{trajs.length}</code></div>
+        <div>err: <code>{err ?? "(none)"}</code></div>
+        <div>source: <code>{apiSource ?? "(not yet)"}</code></div>
+        <div>first trajectory_id: <code>{trajs[0]?.trajectory_id?.slice(0, 8) ?? "(none)"}</code></div>
+        <button className="refetch-btn" onClick={() => {
+          setLoading(true);
+          fetch("/api/traces")
+            .then((r) => r.json())
+            .then((d) => { setTrajs(d.trajectories || []); setApiSource(d.source || null); })
+            .catch((e) => setErr(String(e)))
+            .finally(() => setLoading(false));
+        }}>↻ Manual refetch</button>
+      </div>
       {err && (
         <div className="banner err">
           Error loading traces: {err}

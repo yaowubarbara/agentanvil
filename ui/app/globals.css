@@ -381,6 +381,26 @@ button { font-family: inherit; cursor: pointer; }
 .cell .step { font-size: 10px; color: var(--text-dim2); font-family: var(--mono); }
 .cell .content { font-size: 12px; color: var(--text); margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono); }
 
+.debug-panel {
+  position: fixed; top: 64px; right: 16px; z-index: 20;
+  background: rgba(16,24,40,0.95);
+  border: 2px solid var(--accent-b);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text);
+  min-width: 260px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.debug-panel code { font-size: 10.5px; background: rgba(77,107,254,0.15); color: #a8b8ff; }
+.debug-panel > div { margin-bottom: 4px; }
+.refetch-btn {
+  background: var(--accent-b); color: #fff; border: 0;
+  padding: 5px 10px; border-radius: 4px; font-size: 11px; font-family: var(--mono);
+  margin-top: 6px; cursor: pointer;
+}
+.refetch-btn:hover { background: var(--accent-v); }
+
 .banner { padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; }
 .banner.err { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.35); color: #ffb3b3; }
 .banner.warn { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.35); color: #fbe29a; }
