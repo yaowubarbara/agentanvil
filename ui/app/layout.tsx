@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
+import Nav from "./components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AgentAnvil — trajectory replay",
-  description: "Scaffold-agnostic Agent trajectory viewer",
+  title: "AgentAnvil — scaffold-agnostic agent harness",
+  description: "Trajectory observability + evaluation for any agent scaffold",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Nav />
+        <div className="page-root">{children}</div>
+      </body>
     </html>
   );
 }

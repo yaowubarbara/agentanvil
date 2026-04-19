@@ -1,25 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import MetricCard from "./components/MetricCard";
+import AccuracyBarChart from "./components/AccuracyBarChart";
+import Heatmap from "./components/Heatmap";
+import Sparkline from "./components/Sparkline";
 
-type EventKind =
-  | "observation"
-  | "thought"
-  | "tool_call"
-  | "tool_result"
-  | "final_answer"
-  | "reward"
-  | "error";
-
-type Event = {
-  kind: EventKind;
-  content: unknown;
-  step: number;
-  ts: number;
-  meta?: Record<string, unknown>;
-};
-
+type Event = { kind: string; step: number; ts: number; content: unknown };
 type Trajectory = {
   trajectory_id: string;
   task_id: string;
@@ -27,160 +15,171 @@ type Trajectory = {
   started_at: number;
   finished_at: number | null;
   events: Event[];
-  verify?: {
-    correct: boolean;
-    reward: number;
-    parsed: unknown;
-    gold: unknown;
-    meta?: Record<string, unknown>;
-  };
+  verify?: { correct: boolean; reward: number; parsed: unknown; gold: unknown };
 };
-
-function renderContent(c: unknown): string {
-  if (typeof c === "string") return c;
-  try {
-    return JSON.stringify(c, null, 2);
-  } catch {
-    return String(c);
-  }
-}
 
 function shortTime(ts: number) {
   if (!ts) return "";
   return new Date(ts * 1000).toISOString().slice(11, 19);
 }
 
-export default function Home() {
-  const router = useRouter();
+export default function Dashboard() {
   const [trajs, setTrajs] = useState<Trajectory[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [pickA, setPickA] = useState<string | null>(null);
-  const [pickB, setPickB] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/traces")
       .then((r) => r.json())
-      .then((data) => {
-        setTrajs(data.trajectories || []);
-        if (data.trajectories?.length) {
-          setSelected(data.trajectories[0].trajectory_id);
-        }
-      })
-      .catch((e) => setError(String(e)));
+      .then((d) => setTrajs(d.trajectories || []))
+      .catch((e) => setErr(String(e)));
   }, []);
 
-  function togglePick(id: string) {
-    if (pickA === id) {
-      setPickA(null);
-    } else if (pickB === id) {
-      setPickB(null);
-    } else if (!pickA) {
-      setPickA(id);
-    } else if (!pickB) {
-      setPickB(id);
+  const stats = useMemo(() => {
+    const byScaffold = new Map<string, { n: number; correct: number; rewards: number[] }>();
+    const byTask = new Map<string, number>();
+    const cells: { scaffold: string; task: string; correct: boolean | null }[] = [];
+    let total = 0;
+    let correct = 0;
+    let totalEvents = 0;
+
+    for (const t of trajs) {
+      total += 1;
+      totalEvents += t.events.length;
+      const ok = !!t.verify?.correct;
+      if (ok) correct += 1;
+      const s = byScaffold.get(t.scaffold) || { n: 0, correct: 0, rewards: [] };
+      s.n += 1;
+      if (ok) s.correct += 1;
+      s.rewards.push(t.verify?.reward ?? 0);
+      byScaffold.set(t.scaffold, s);
+      byTask.set(t.task_id, (byTask.get(t.task_id) || 0) + 1);
+      cells.push({
+        scaffold: t.scaffold,
+        task: t.task_id,
+        correct: t.verify ? !!t.verify.correct : null,
+      });
     }
-  }
+    const scaffolds = Array.from(byScaffold.entries()).map(([name, v]) => ({
+      scaffold: name,
+      n: v.n,
+      correct: v.correct,
+      rewards: v.rewards,
+    }));
+    return {
+      total,
+      correct,
+      accuracy: total ? correct / total : 0,
+      totalEvents,
+      avgEvents: total ? totalEvents / total : 0,
+      scaffolds,
+      taskCount: byTask.size,
+      cells,
+    };
+  }, [trajs]);
 
-  function pickLabel(id: string): string {
-    if (pickA === id) return "A ✓";
-    if (pickB === id) return "B ✓";
-    return "diff ↔";
-  }
-
-  const current = trajs.find((t) => t.trajectory_id === selected);
-  const canCompare = pickA && pickB && pickA !== pickB;
+  const recent = trajs.slice(0, 6);
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <h1>AgentAnvil · traces</h1>
-        <div className="diff-bar">
-          <div>
-            Diff mode:{" "}
-            <span className="chosen">A={pickA ? pickA.slice(0, 8) : "—"}</span>{" "}
-            <span className="chosen">B={pickB ? pickB.slice(0, 8) : "—"}</span>
+    <main className="dashboard">
+      {err && <div className="banner err">Error loading traces: {err}</div>}
+
+      <section className="hero">
+        <h1 className="hero-title">
+          <span className="hero-gradient">Agent evaluation</span> at a glance
+        </h1>
+        <p className="hero-sub">
+          Scaffold-agnostic trajectory observability for {stats.taskCount || 0} tasks across{" "}
+          {stats.scaffolds.length} scaffold{stats.scaffolds.length === 1 ? "" : "s"}.
+        </p>
+      </section>
+
+      <section className="metrics-row">
+        <MetricCard
+          label="Trajectories"
+          value={stats.total}
+          sub={stats.totalEvents.toLocaleString() + " total events"}
+          accent="#7cc4ff"
+        />
+        <MetricCard
+          label="Accuracy"
+          value={(stats.accuracy * 100).toFixed(1) + "%"}
+          sub={stats.correct + "/" + stats.total + " correct"}
+          accent="#6fcf97"
+        />
+        <MetricCard
+          label="Scaffolds"
+          value={stats.scaffolds.length}
+          sub={stats.taskCount + " unique tasks"}
+          accent="#a78bfa"
+        />
+        <MetricCard
+          label="Avg events / run"
+          value={stats.avgEvents.toFixed(1)}
+          sub="higher = more tool use"
+          accent="#f0b54d"
+        />
+      </section>
+
+      <section className="panels">
+        <div className="panel">
+          <div className="panel-title">
+            Accuracy by scaffold
+            <span className="panel-sub">horizontal bars; animated on load</span>
           </div>
-          <button
-            disabled={!canCompare}
-            onClick={() => router.push(`/diff?a=${pickA}&b=${pickB}`)}
-          >
-            Compare →
-          </button>
+          <AccuracyBarChart data={stats.scaffolds.map(({ scaffold, n, correct }) => ({ scaffold, n, correct }))} />
         </div>
-        {error && <div className="empty">Error: {error}</div>}
-        {!error && trajs.length === 0 && (
-          <div className="empty">
-            No traces. Run <code>examples/seed_demo_traces.py</code> or{" "}
-            <code>examples/run_jordan_count.py</code>.
+
+        <div className="panel">
+          <div className="panel-title">
+            Recent activity
+            <span className="panel-sub">6 most recent trajectories</span>
           </div>
-        )}
-        {trajs.map((t) => {
-          const ok = t.verify?.correct;
-          const isPicked = pickA === t.trajectory_id || pickB === t.trajectory_id;
-          return (
-            <div
-              key={t.trajectory_id}
-              className={`item ${t.trajectory_id === selected ? "active" : ""}`}
-              onClick={() => setSelected(t.trajectory_id)}
-            >
-              <div>{t.task_id}</div>
-              <div className="meta">
-                {t.scaffold}
-                {t.verify && (
-                  <>
-                    {" · "}
-                    <span className={ok ? "reward-ok" : "reward-bad"}>
-                      {ok ? "✓" : "✗"} r={t.verify.reward}
-                    </span>
-                  </>
-                )}
+          <div className="recent-list">
+            {recent.length === 0 && (
+              <div className="empty-chart">
+                No traces yet. Run{" "}
+                <code>python examples/seed_demo_traces.py</code> or{" "}
+                <code>aa eval run gsm8k-mini</code>.
               </div>
-              <span
-                className={`diff-pick ${isPicked ? "picked" : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePick(t.trajectory_id);
-                }}
-              >
-                {pickLabel(t.trajectory_id)}
-              </span>
-            </div>
-          );
-        })}
-      </aside>
-      <main className="main">
-        {!current ? (
-          <div className="empty">Select a trajectory from the sidebar.</div>
-        ) : (
-          <>
-            <div className="header">
-              <h2>
-                {current.task_id} · <span style={{ color: "#a78bfa" }}>{current.scaffold}</span>
-              </h2>
-              <div className="sub">
-                trajectory_id: {current.trajectory_id} · started {shortTime(current.started_at)}
-                {current.verify && (
-                  <>
-                    {" · "}
-                    <strong>
-                      parsed={String(current.verify.parsed)} gold={String(current.verify.gold)}{" "}
-                      {current.verify.correct ? "✓" : "✗"}
-                    </strong>
-                  </>
-                )}
-              </div>
-            </div>
-            {current.events.map((e, i) => (
-              <div key={i} className={`event ${e.kind}`}>
-                <div className="step">step {e.step} · {shortTime(e.ts)}</div>
-                <div className="kind">{e.kind}</div>
-                <pre className="content">{renderContent(e.content)}</pre>
-              </div>
-            ))}
-          </>
-        )}
-      </main>
-    </div>
+            )}
+            {recent.map((t) => {
+              const ok = t.verify?.correct;
+              return (
+                <Link
+                  key={t.trajectory_id}
+                  href={`/trace/${t.trajectory_id}`}
+                  className="recent-row"
+                >
+                  <div className="recent-main">
+                    <div className="recent-task">{t.task_id}</div>
+                    <div className="recent-scaffold">{t.scaffold}</div>
+                  </div>
+                  <Sparkline
+                    values={t.events.map((e) =>
+                      e.kind === "reward" ? 1 : e.kind === "tool_call" ? 0.6 : 0.3
+                    )}
+                    color={ok ? "#6fcf97" : "#eb5757"}
+                  />
+                  <div className={`recent-verdict ${ok ? "ok" : "bad"}`}>
+                    {ok ? "✓" : "✗"}
+                  </div>
+                  <div className="recent-meta">
+                    {t.events.length}ev · {shortTime(t.started_at)}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel wide">
+        <div className="panel-title">
+          Scaffold × Task heatmap
+          <span className="panel-sub">green=correct, red=wrong, gray=not run</span>
+        </div>
+        <Heatmap cells={stats.cells} />
+      </section>
+    </main>
   );
 }
