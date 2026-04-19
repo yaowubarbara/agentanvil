@@ -26,6 +26,9 @@ all = [
     "shapely",
 ]
 
+[project.scripts]
+aa = "agentanvil.cli:main"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

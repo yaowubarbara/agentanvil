@@ -1,0 +1,7 @@
+name: gsm8k-mini
+verifier: agentanvil.verifier.gsm8k.GSM8KVerifier
+task_class: agentanvil.verifier.gsm8k.GSM8KTask
+version: 0.1.0
+license: MIT (problems hand-adapted from Cobbe et al. 2021 style)
+source: hand-authored smoke-test pack
+description: 12 grade-school math word problems for pipeline smoke-testing.

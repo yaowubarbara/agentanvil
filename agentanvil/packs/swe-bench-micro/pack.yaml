@@ -1,0 +1,7 @@
+name: swe-bench-micro
+verifier: agentanvil.verifier.swe_bench_lite.SWEBenchLiteVerifier
+task_class: agentanvil.verifier.swe_bench_lite.SWEBenchLiteTask
+version: 0.1.0
+license: MIT (hand-authored for pipeline smoke testing)
+source: hand-authored — for full SWE-bench Lite integration run the conversion script
+description: 4 tiny synthetic repo-fix tasks. Lightweight overlap scoring only; not full pass@1.

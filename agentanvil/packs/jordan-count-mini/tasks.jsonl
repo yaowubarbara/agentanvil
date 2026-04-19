@@ -1,0 +1,6 @@
+{"task_id": "jordan-count-mini/001", "image_path": null, "gold_count": 3, "dots": [[100, 100], [200, 200], [150, 150]], "curve_points": null}
+{"task_id": "jordan-count-mini/002", "image_path": null, "gold_count": 0, "dots": [[10, 10], [20, 20]], "curve_points": null}
+{"task_id": "jordan-count-mini/003", "image_path": null, "gold_count": 2, "dots": [[100, 100], [200, 200], [300, 300]], "curve_points": null}
+{"task_id": "jordan-count-mini/004", "image_path": null, "gold_count": 5, "dots": [[100, 100], [110, 110], [120, 120], [130, 130], [140, 140]], "curve_points": null}
+{"task_id": "jordan-count-mini/005", "image_path": null, "gold_count": 1, "dots": [[50, 50], [500, 500]], "curve_points": null}
+{"task_id": "jordan-count-mini/006", "image_path": null, "gold_count": 4, "dots": [[100, 100], [150, 150], [200, 200], [250, 250], [300, 300]], "curve_points": null}

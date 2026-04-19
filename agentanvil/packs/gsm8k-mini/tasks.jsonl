@@ -1,0 +1,12 @@
+{"task_id": "gsm8k-mini/001", "question": "Janet has 5 apples. She buys 3 more and gives 2 to her brother. How many apples does she have now?", "gold_answer": "Start: 5. After buying: 5 + 3 = 8. After giving away: 8 - 2 = 6. #### 6"}
+{"task_id": "gsm8k-mini/002", "question": "A train travels 60 miles per hour for 4 hours, then 40 miles per hour for 2 hours. Total distance?", "gold_answer": "60*4 + 40*2 = 240 + 80 = 320. #### 320"}
+{"task_id": "gsm8k-mini/003", "question": "Sara earns 12 dollars per hour and works 8 hours Monday, 6 hours Tuesday, and 4 hours Wednesday. Total earnings?", "gold_answer": "12 * (8 + 6 + 4) = 12 * 18 = 216. #### 216"}
+{"task_id": "gsm8k-mini/004", "question": "A rectangle has length 12 and width 7. What is its perimeter?", "gold_answer": "2*(12+7) = 38. #### 38"}
+{"task_id": "gsm8k-mini/005", "question": "Tom has 3 times as many marbles as Lisa. Lisa has 15 marbles. How many do they have together?", "gold_answer": "Tom has 3*15 = 45. Together: 45 + 15 = 60. #### 60"}
+{"task_id": "gsm8k-mini/006", "question": "A store sells pens at 3 for $5. How much do 24 pens cost?", "gold_answer": "24 / 3 = 8 groups. 8 * 5 = 40. #### 40"}
+{"task_id": "gsm8k-mini/007", "question": "Maria bakes 8 dozen cookies. She keeps 1/4 and gives the rest away. How many cookies does she give away?", "gold_answer": "8*12 = 96. Give away: 96 * 3/4 = 72. #### 72"}
+{"task_id": "gsm8k-mini/008", "question": "Dan is 5 years older than Amy. Amy is twice as old as Ben. Ben is 8. How old is Dan?", "gold_answer": "Amy = 2*8 = 16. Dan = 16 + 5 = 21. #### 21"}
+{"task_id": "gsm8k-mini/009", "question": "A tank holds 500 liters. It drains at 25 liters per minute. How long until empty?", "gold_answer": "500 / 25 = 20 minutes. #### 20"}
+{"task_id": "gsm8k-mini/010", "question": "A book has 240 pages. Emma reads 30 pages per day. How many days to finish?", "gold_answer": "240 / 30 = 8 days. #### 8"}
+{"task_id": "gsm8k-mini/011", "question": "A recipe needs 3/4 cup of sugar per batch. How much sugar for 6 batches?", "gold_answer": "3/4 * 6 = 18/4 = 4.5 cups. #### 4.5"}
+{"task_id": "gsm8k-mini/012", "question": "If 7 workers can build a wall in 12 days, how many days would 3 workers take (same rate)?", "gold_answer": "Total work = 7*12 = 84 worker-days. 84/3 = 28. #### 28"}

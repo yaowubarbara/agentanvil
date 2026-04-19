@@ -1,0 +1,7 @@
+name: jordan-count-mini
+verifier: agentanvil.verifier.jordan_count.JordanCountVerifier
+task_class: agentanvil.verifier.jordan_count.JordanCountTask
+version: 0.1.0
+license: MIT
+source: adapted from yaowubarbara/jordan-count — small hand-curated subset
+description: 6 topological inside-outside reasoning tasks (hand-sampled difficulty ladder).

@@ -1,0 +1,7 @@
+name: humaneval-mini
+verifier: agentanvil.verifier.humaneval.HumanEvalVerifier
+task_class: agentanvil.verifier.humaneval.HumanEvalTask
+version: 0.1.0
+license: MIT (tasks hand-authored in HumanEval style)
+source: hand-authored smoke-test pack
+description: 8 simple Python function-completion tasks for code-agent smoke testing.
