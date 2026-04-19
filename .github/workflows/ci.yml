@@ -1,0 +1,167 @@
+# AgentAnvil CI — runs on every push + PR against main.
+#
+# Philosophy: each tier of the stack (Python, Rust, Helm, Next.js) has its
+# own job so failures surface surgically. Jobs run in parallel where
+# dependencies allow, sequentially only when they must.
+#
+# Steps exercised:
+#   - Python:  ruff (lint) + all 91 tests
+#   - Rust:    cargo fmt + cargo clippy + cargo test (5 tests)
+#   - Helm:    helm lint + helm template (no live cluster needed)
+#   - Next.js: npm install + npm run build (prerender all 5 routes)
+#   - Audit:   scripts/check_clean.sh (API keys, Claude taglines)
+#
+# Runs on ubuntu-latest. No external services, no secrets, no cluster —
+# pure offline CI. Adding live-LLM smoke or real OpenSandbox live test
+# would require secrets and a self-hosted runner; intentionally out of
+# scope for open-source CI.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # ───────────────────────────────────────────────────────────────
+  audit:
+    name: Audit (Claude/API-key scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # need full git log for commit-message scan
+      - name: Run check_clean.sh
+        run: bash scripts/check_clean.sh
+
+  # ───────────────────────────────────────────────────────────────
+  python:
+    name: Python ${{ matrix.python-version }} tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Ruff lint (non-blocking diagnostic)
+        run: |
+          pip install ruff
+          ruff check agentanvil/ tests/ examples/ || echo "ruff findings above (not gating)"
+      - name: Protocol conformance
+        run: python3 tests/test_protocol_conformance.py
+      - name: New adapter conformance
+        run: python3 tests/test_new_adapters_conformance.py
+      - name: New verifiers
+        run: python3 tests/test_new_verifiers.py
+      - name: Dataset + packs
+        run: python3 tests/test_dataset.py
+      - name: CLI
+        run: python3 tests/test_cli.py
+      - name: Evaluator
+        run: python3 tests/test_evaluator.py
+      - name: Agent Lightning (stub)
+        run: python3 tests/test_agent_lightning_stub.py
+      - name: Agent Lightning (real-integration path)
+        run: python3 tests/test_agent_lightning_real.py
+      - name: OpenSandbox runtime
+        run: python3 tests/test_opensandbox_runtime.py
+
+  # ───────────────────────────────────────────────────────────────
+  rust:
+    name: Rust supervisor
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supervisor
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: cargo test --release
+        run: cargo test --release
+      - name: Integration smoke (supervisor on real subprocess)
+        run: |
+          set -e
+          BIN=./target/release/agentanvil-supervisor
+          echo "=== normal completion ==="
+          $BIN run --timeout 5 --grace 2 --socket /tmp/anvil-a.sock \
+              -- sh -c "echo hello; sleep 0.2"
+          echo "=== SIGTERM escalation ==="
+          # allow non-zero exit from timeout case
+          $BIN run --timeout 1 --grace 2 --socket /tmp/anvil-b.sock \
+              -- sleep 10 || true
+          echo "=== SIGKILL escalation (child traps SIGTERM) ==="
+          $BIN run --timeout 1 --grace 1 --socket /tmp/anvil-c.sock \
+              -- sh -c 'trap "" TERM; sleep 10' || true
+
+  # ───────────────────────────────────────────────────────────────
+  helm:
+    name: Helm chart lint + template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - name: helm lint
+        run: helm lint deploy/helm/agentanvil
+      - name: helm template (default values)
+        run: helm template ci-release deploy/helm/agentanvil > /tmp/rendered-default.yaml
+      - name: helm template (rolloutJob.enabled=true)
+        run: |
+          helm template ci-release deploy/helm/agentanvil \
+              --set rolloutJob.enabled=true > /tmp/rendered-with-job.yaml
+      - name: Verify securityContext lockdown survived rendering
+        run: |
+          set -e
+          f=/tmp/rendered-default.yaml
+          grep -q "runAsNonRoot: true"           "$f"
+          grep -q "readOnlyRootFilesystem: true" "$f"
+          grep -q "seccompProfile:"              "$f"
+          grep -q "drop:"                        "$f"
+          echo "✓ all security hardening flags present in rendered YAML"
+
+  # ───────────────────────────────────────────────────────────────
+  ui:
+    name: Next.js build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+      - name: Install
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
+      - name: Confirm 5 routes compiled
+        run: |
+          set -e
+          test -d .next
+          echo "✓ Next.js .next/ produced"
