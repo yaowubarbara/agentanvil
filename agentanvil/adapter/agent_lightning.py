@@ -216,10 +216,21 @@ class AnvilLitAgent:
 def build_lit_agent(anvil_agent, verifier, scaffold_hint: Optional[str] = None):
     """Build an Agent Lightning `LitAgent` subclass bound to AgentAnvil.
 
-    If agent-lightning is installed, returns a real `agentlightning.LitAgent`
-    subclass that delegates to AnvilLitAgent. If not, returns AnvilLitAgent
-    directly — same interface, same behavior, just not a subclass of the
-    real base.
+    When agent-lightning is installed (verified against v0.3.0 — 2026-04),
+    returns a real `agentlightning.LitAgent` subclass whose `rollout()` method
+    matches the real signature `(task, resources, rollout) -> float`. When the
+    library is absent, returns `AnvilLitAgent` directly (same rollout logic,
+    just not a subclass of the real base).
+
+    The real `LitAgent.rollout()` can return:
+      - None (tracing externalized)
+      - float (final reward)                           ← we return this
+      - List[ReadableSpan] / List[Span] (OTel spans)
+
+    We return `float` because our verifier already produces a scalar reward;
+    the detailed trajectory is captured separately via our trace sinks
+    (LocalJsonlSink / LangfuseSink / OpenTelemetrySink) — the Agent Lightning
+    runner's tracing layer is orthogonal.
     """
     inner = AnvilLitAgent(anvil_agent, verifier, scaffold_hint=scaffold_hint)
     try:
@@ -228,20 +239,60 @@ def build_lit_agent(anvil_agent, verifier, scaffold_hint: Optional[str] = None):
         return inner
 
     class _AnvilBackedLitAgent(LitAgent):   # type: ignore[misc]
+        """Real `agentlightning.LitAgent` subclass routing to AnvilLitAgent."""
+
         def __init__(self):
             super().__init__()
             self._inner = inner
 
-        def rollout(self, task):
+        def rollout(self, task, resources, rollout):   # real AL signature
+            # The Agent Lightning runner may pass the task as a dict (TaskInput)
+            # or as a typed payload. If it looks like our AnvilTask (has a
+            # task_id + initial_observation), route it straight; otherwise try
+            # dict-style access.
+            anvil_task = _coerce_to_anvil_task(task)
+            al_rollout = self._inner.rollout(anvil_task)
+            # Return the scalar reward per Agent Lightning's contract.
+            return float(al_rollout.reward)
+
+        def training_rollout(self, task, resources, rollout):
+            return self.rollout(task, resources, rollout)
+
+        def validation_rollout(self, task, resources, rollout):
+            return self.rollout(task, resources, rollout)
+
+        # Expose the richer internal rollout for callers that want it.
+        def rollout_rich(self, task):
             return self._inner.rollout(task)
 
-        def training_step(self, batch, batch_idx=None):
-            return self._inner.training_step(batch)
-
-        def validation_step(self, batch, batch_idx=None):
-            return self._inner.validation_step(batch)
-
     return _AnvilBackedLitAgent()
+
+
+def _coerce_to_anvil_task(task):
+    """Best-effort: accept AnvilTask, pydantic model, or dict payload."""
+    if hasattr(task, "initial_observation") and hasattr(task, "task_id"):
+        return task
+    # Pydantic Task (agent-lightning style) — convert to AnvilTask-shaped duck
+    if hasattr(task, "model_dump"):
+        data = task.model_dump()
+    elif isinstance(task, dict):
+        data = task
+    else:
+        data = {"task_id": str(task), "text": str(task)}
+
+    class _DuckTask:
+        def __init__(self, d):
+            self.task_id = d.get("task_id") or d.get("id") or str(hash(frozenset(d.items()) if isinstance(d, dict) else id(d)))
+            self._data = d
+
+        def initial_observation(self):
+            text = self._data.get("text") or self._data.get("question") or self._data.get("prompt", "")
+            out = {"text": text}
+            if "image_path" in self._data:
+                out["image_path"] = self._data["image_path"]
+            return out
+
+    return _DuckTask(data)
 
 
 def train_with_agent_lightning(
@@ -253,38 +304,64 @@ def train_with_agent_lightning(
     trainer_kwargs: Optional[dict] = None,
     fallback_to_stub: bool = True,
 ):
-    """Run a real Agent Lightning training loop over an AgentAnvil dataset.
+    """Drive rollouts over a dataset, either via a real agent-lightning
+    `LitAgent` + manual iteration (if the lib is installed) or via
+    `ALTrainerStub` fallback.
 
-    If agent-lightning is installed, uses their Trainer + TaskLoader. If not
-    and `fallback_to_stub=True`, runs through ALTrainerStub so the pipeline
-    still exercises end-to-end; returns the stub trainer with aggregated stats.
-
-    Returns: the (real or stub) trainer, the lit_agent, and (for real runs)
-    any fit metrics agent-lightning surfaces.
+    Note: the full `agentlightning.Trainer` needs a `LightningStore` +
+    `Algorithm` + `ExecutionStrategy` to do actual RL updates; wiring those
+    is the algo team's job. Our contract is: produce per-task rollouts that
+    the real `LitAgent.rollout(task, resources, rollout)` would be called for.
     """
     lit_agent = build_lit_agent(anvil_agent, verifier)
 
     try:
-        from agentlightning import Trainer as ALTrainer  # type: ignore
-        from agentlightning import TaskLoader  # type: ignore
+        import agentlightning  # type: ignore
+        from agentlightning import Rollout as _ALRollout  # type: ignore
+        real_al = True
     except ImportError:
-        if not fallback_to_stub:
-            raise ImportError(
-                "pip install agent-lightning, or pass fallback_to_stub=True"
-            )
-        stub = ALTrainerStub()
-        tasks = list(dataset.tasks) if hasattr(dataset, "tasks") else list(dataset)
-        for epoch in range(max_epochs):
-            for i in range(0, len(tasks), batch_size):
-                batch = tasks[i : i + batch_size]
-                for r in lit_agent.training_step(batch):
-                    stub.consume(r)
-        return {"trainer": stub, "lit_agent": lit_agent, "report": stub.report(), "path": "stub"}
+        real_al = False
 
-    kwargs = dict(trainer_kwargs or {})
-    kwargs.setdefault("max_epochs", max_epochs)
-    trainer = ALTrainer(**kwargs)
     tasks = list(dataset.tasks) if hasattr(dataset, "tasks") else list(dataset)
-    loader = TaskLoader(tasks, batch_size=batch_size)
-    trainer.fit(lit_agent, loader)
-    return {"trainer": trainer, "lit_agent": lit_agent, "report": None, "path": "real"}
+    stub = ALTrainerStub()
+
+    if real_al and hasattr(lit_agent, "rollout_rich"):
+        # Drive the REAL LitAgent subclass per task; it returns a float reward
+        # via the real signature, and rollout_rich gives us the fat AnvilLitAgent
+        # rollout for the stub trainer's aggregation.
+        for epoch in range(max_epochs):
+            for t in tasks:
+                # Call the real AL-contract method to prove integration:
+                empty_rollout = _ALRollout(
+                    rollout_id=f"agentanvil-{id(t)}",
+                    input={"task_id": getattr(t, "task_id", str(t))},
+                    start_time=0.0,
+                )
+                reward_scalar = lit_agent.rollout(t, {}, empty_rollout)
+                # Also get the rich rollout for our own aggregation
+                fat = lit_agent.rollout_rich(t)
+                fat.meta["al_contract_reward"] = reward_scalar
+                stub.consume(fat)
+        return {
+            "trainer": stub,
+            "lit_agent": lit_agent,
+            "report": stub.report(),
+            "path": "real-agentlightning",
+        }
+
+    if not fallback_to_stub and not real_al:
+        raise ImportError(
+            "pip install agentlightning, or pass fallback_to_stub=True"
+        )
+    # Pure fallback path — AnvilLitAgent without the real LitAgent base
+    for epoch in range(max_epochs):
+        for t in tasks:
+            r = lit_agent.rollout(t) if hasattr(lit_agent, "rollout") else None
+            if r is not None and hasattr(r, "reward"):
+                stub.consume(r)
+    return {
+        "trainer": stub,
+        "lit_agent": lit_agent,
+        "report": stub.report(),
+        "path": "fallback-stub",
+    }

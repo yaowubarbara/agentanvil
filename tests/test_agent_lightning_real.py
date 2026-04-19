@@ -129,6 +129,9 @@ def test_build_lit_agent_returns_something_with_rollout():
 
 
 def test_train_fallback_to_stub_runs_full_dataset():
+    """When agentlightning is installed, path is 'real-agentlightning';
+    when absent, path is 'fallback-stub'. Either way the report must
+    reflect the full dataset and 100% accuracy for an always-correct agent."""
     agent = _FakeAgent(lambda t: t.answer_expected)   # always correct
     verifier = _ExactMatchVerifier()
     dataset = _FakeDataset([_FakeTask(f"t{i}", str(i)) for i in range(7)])
@@ -136,7 +139,7 @@ def test_train_fallback_to_stub_runs_full_dataset():
     result = train_with_agent_lightning(
         agent, verifier, dataset, max_epochs=1, batch_size=3, fallback_to_stub=True
     )
-    assert result["path"] == "stub"
+    assert result["path"] in ("real-agentlightning", "fallback-stub")
     report = result["report"]
     assert report["n"] == 7
     assert report["accuracy"] == 1.0
@@ -176,9 +179,9 @@ def test_train_no_fallback_raises_when_lib_absent():
             agent, verifier, dataset, fallback_to_stub=False
         )
     except ImportError as e:
-        assert "agent-lightning" in str(e)
+        assert "agentlightning" in str(e).lower()
         return
-    raise AssertionError("expected ImportError when agent-lightning absent and fallback disabled")
+    raise AssertionError("expected ImportError when agentlightning absent and fallback disabled")
 
 
 def test_build_lit_agent_real_when_installed():
