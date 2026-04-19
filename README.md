@@ -7,6 +7,7 @@ Plug any agent scaffold — Claude Code, OpenAI Agents SDK, LangChain, LangGraph
 ![Dashboard](docs/dashboard.gif)
 
 <p align="left">
+<img alt="CI" src="https://github.com/yaowubarbara/agentanvil/actions/workflows/ci.yml/badge.svg">
 <img alt="tests" src="https://img.shields.io/badge/tests-96%20green-brightgreen">
 <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
 <img alt="rust" src="https://img.shields.io/badge/rust-1.95-orange">
