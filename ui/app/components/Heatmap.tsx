@@ -13,7 +13,10 @@ export default function Heatmap({ cells }: Props) {
 
   const cellSize = 22;
   const scaffoldLabelW = 160;
-  const taskLabelH = 110;
+  // Rotate column labels only when there are enough tasks that horizontal
+  // labels would collide. With ≤4 tasks, horizontal reads much cleaner.
+  const rotateLabels = tasks.length > 4;
+  const taskLabelH = rotateLabels ? 110 : 28;
   const w = scaffoldLabelW + tasks.length * (cellSize + 2);
   const h = taskLabelH + scaffolds.length * (cellSize + 2);
 
@@ -25,21 +28,36 @@ export default function Heatmap({ cells }: Props) {
       viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Task labels rotated */}
-      {tasks.map((task, i) => (
-        <text
-          key={task}
-          x={scaffoldLabelW + i * (cellSize + 2) + cellSize / 2}
-          y={taskLabelH - 10}
-          textAnchor="end"
-          transform={`rotate(-55 ${
-            scaffoldLabelW + i * (cellSize + 2) + cellSize / 2
-          } ${taskLabelH - 10})`}
-          className="chart-label small"
-        >
-          {task.length > 22 ? "…" + task.slice(-22) : task}
-        </text>
-      ))}
+      {/* Column (task) labels */}
+      {tasks.map((task, i) => {
+        const cx = scaffoldLabelW + i * (cellSize + 2) + cellSize / 2;
+        const cy = taskLabelH - 8;
+        if (rotateLabels) {
+          return (
+            <text
+              key={task}
+              x={cx}
+              y={cy}
+              textAnchor="end"
+              transform={`rotate(-55 ${cx} ${cy})`}
+              className="chart-label small"
+            >
+              {task.length > 22 ? "…" + task.slice(-22) : task}
+            </text>
+          );
+        }
+        return (
+          <text
+            key={task}
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            className="chart-label small"
+          >
+            {task}
+          </text>
+        );
+      })}
       {/* Scaffold labels + cells */}
       {scaffolds.map((sc, rowIdx) => (
         <g key={sc}>
