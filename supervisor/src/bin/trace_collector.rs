@@ -206,7 +206,9 @@ fn main() -> ExitCode {
         let line = match line {
             Ok(l) => l,
             Err(e) => {
-                report.violations.push(format!("io error line {}: {}", report.total_lines, e));
+                report
+                    .violations
+                    .push(format!("io error line {}: {}", report.total_lines, e));
                 continue;
             }
         };
@@ -216,7 +218,9 @@ fn main() -> ExitCode {
         let traj: Trajectory = match serde_json::from_str(&line) {
             Ok(t) => t,
             Err(e) => {
-                report.violations.push(format!("parse error line {}: {}", report.total_lines, e));
+                report
+                    .violations
+                    .push(format!("parse error line {}: {}", report.total_lines, e));
                 continue;
             }
         };
@@ -248,10 +252,7 @@ fn main() -> ExitCode {
         report.filtered_in += 1;
 
         // Aggregate
-        let ss = report
-            .by_scaffold
-            .entry(traj.scaffold.clone())
-            .or_default();
+        let ss = report.by_scaffold.entry(traj.scaffold.clone()).or_default();
         ss.n += 1;
         if correct {
             ss.correct += 1;
@@ -259,18 +260,11 @@ fn main() -> ExitCode {
         ss.total_events += traj.events.len() as u64;
         event_counts_total += traj.events.len() as u64;
 
-        let tool_calls = traj
-            .events
-            .iter()
-            .filter(|e| e.kind == "tool_call")
-            .count() as u64;
+        let tool_calls = traj.events.iter().filter(|e| e.kind == "tool_call").count() as u64;
         ss.tool_call_events += tool_calls;
 
-        let dur_ms = (traj
-            .finished_at
-            .unwrap_or(traj.started_at)
-            - traj.started_at)
-            .max(0.0) * 1000.0;
+        let dur_ms =
+            (traj.finished_at.unwrap_or(traj.started_at) - traj.started_at).max(0.0) * 1000.0;
         let dur_ms_u = dur_ms as u64;
         ss.total_duration_ms += dur_ms_u;
         duration_sum_ms += dur_ms_u;
@@ -316,6 +310,76 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+fn print_human(r: &Report) {
+    println!("═══════════════════════════════════════════════════════════════");
+    println!("  AgentAnvil trace-collector report");
+    println!("═══════════════════════════════════════════════════════════════");
+    println!("  source:              {}", r.source_path);
+    println!("  total lines:         {}", r.total_lines);
+    println!("  parsed OK:           {}", r.parsed);
+    println!("  validation errors:   {}", r.validation_errors);
+    println!("  after filters:       {}", r.filtered_in);
+    println!();
+    println!("  overall accuracy:    {:.1}%", r.overall_accuracy * 100.0);
+    println!("  mean events / traj:  {:.1}", r.mean_events_per_trajectory);
+    println!("  mean duration:       {:.1} ms", r.mean_duration_ms);
+    println!();
+    println!("── per-scaffold ──────────────────────────────────────────────");
+    println!(
+        "  {:<24} {:>6} {:>6} {:>8} {:>10} {:>10}",
+        "scaffold", "n", "✓", "acc", "avg_ev", "avg_ms"
+    );
+    println!("  {}", "─".repeat(66));
+    let mut scaffolds: Vec<(&String, &ScaffoldStats)> = r.by_scaffold.iter().collect();
+    scaffolds.sort_by_key(|b| std::cmp::Reverse(b.1.n));
+    for (name, s) in scaffolds {
+        let acc = if s.n > 0 {
+            s.correct as f64 / s.n as f64
+        } else {
+            0.0
+        };
+        let avg_ev = if s.n > 0 {
+            s.total_events as f64 / s.n as f64
+        } else {
+            0.0
+        };
+        let avg_ms = if s.n > 0 {
+            s.total_duration_ms as f64 / s.n as f64
+        } else {
+            0.0
+        };
+        println!(
+            "  {:<24} {:>6} {:>6} {:>7.1}% {:>10.1} {:>10.1}",
+            name,
+            s.n,
+            s.correct,
+            acc * 100.0,
+            avg_ev,
+            avg_ms
+        );
+    }
+
+    println!();
+    println!("── event kind distribution ──────────────────────────────────");
+    let mut kinds: Vec<(&String, &u64)> = r.event_kind_counts.iter().collect();
+    kinds.sort_by(|a, b| b.1.cmp(a.1));
+    for (k, n) in kinds {
+        println!("  {:<16} {}", k, n);
+    }
+
+    if !r.violations.is_empty() {
+        println!();
+        println!("── validation violations (first 10) ──────────────────────────");
+        for v in r.violations.iter().take(10) {
+            println!("  ✗ {}", v);
+        }
+        if r.violations.len() > 10 {
+            println!("  … ({} more)", r.violations.len() - 10);
+        }
+    }
+    println!("═══════════════════════════════════════════════════════════════");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,10 +392,21 @@ mod tests {
             started_at: 0.0,
             finished_at: Some(0.1),
             events: vec![
-                Event { kind: "observation".to_string(), step: 0, ts: 0.0 },
-                Event { kind: "final_answer".to_string(), step: 1, ts: 0.05 },
+                Event {
+                    kind: "observation".to_string(),
+                    step: 0,
+                    ts: 0.0,
+                },
+                Event {
+                    kind: "final_answer".to_string(),
+                    step: 1,
+                    ts: 0.05,
+                },
             ],
-            verify: Some(Verify { correct: Some(correct), reward: Some(if correct { 1.0 } else { 0.0 }) }),
+            verify: Some(Verify {
+                correct: Some(correct),
+                reward: Some(if correct { 1.0 } else { 0.0 }),
+            }),
         }
     }
 
@@ -365,69 +440,4 @@ mod tests {
         let err = validate(&t).unwrap_err();
         assert!(err.contains("MUST-6"));
     }
-}
-
-fn print_human(r: &Report) {
-    println!("═══════════════════════════════════════════════════════════════");
-    println!("  AgentAnvil trace-collector report");
-    println!("═══════════════════════════════════════════════════════════════");
-    println!("  source:              {}", r.source_path);
-    println!("  total lines:         {}", r.total_lines);
-    println!("  parsed OK:           {}", r.parsed);
-    println!("  validation errors:   {}", r.validation_errors);
-    println!("  after filters:       {}", r.filtered_in);
-    println!();
-    println!("  overall accuracy:    {:.1}%", r.overall_accuracy * 100.0);
-    println!("  mean events / traj:  {:.1}", r.mean_events_per_trajectory);
-    println!("  mean duration:       {:.1} ms", r.mean_duration_ms);
-    println!();
-    println!("── per-scaffold ──────────────────────────────────────────────");
-    println!(
-        "  {:<24} {:>6} {:>6} {:>8} {:>10} {:>10}",
-        "scaffold", "n", "✓", "acc", "avg_ev", "avg_ms"
-    );
-    println!("  {}", "─".repeat(66));
-    let mut scaffolds: Vec<(&String, &ScaffoldStats)> = r.by_scaffold.iter().collect();
-    scaffolds.sort_by(|a, b| b.1.n.cmp(&a.1.n));
-    for (name, s) in scaffolds {
-        let acc = if s.n > 0 {
-            s.correct as f64 / s.n as f64
-        } else {
-            0.0
-        };
-        let avg_ev = if s.n > 0 {
-            s.total_events as f64 / s.n as f64
-        } else {
-            0.0
-        };
-        let avg_ms = if s.n > 0 {
-            s.total_duration_ms as f64 / s.n as f64
-        } else {
-            0.0
-        };
-        println!(
-            "  {:<24} {:>6} {:>6} {:>7.1}% {:>10.1} {:>10.1}",
-            name, s.n, s.correct, acc * 100.0, avg_ev, avg_ms
-        );
-    }
-
-    println!();
-    println!("── event kind distribution ──────────────────────────────────");
-    let mut kinds: Vec<(&String, &u64)> = r.event_kind_counts.iter().collect();
-    kinds.sort_by(|a, b| b.1.cmp(a.1));
-    for (k, n) in kinds {
-        println!("  {:<16} {}", k, n);
-    }
-
-    if !r.violations.is_empty() {
-        println!();
-        println!("── validation violations (first 10) ──────────────────────────");
-        for v in r.violations.iter().take(10) {
-            println!("  ✗ {}", v);
-        }
-        if r.violations.len() > 10 {
-            println!("  … ({} more)", r.violations.len() - 10);
-        }
-    }
-    println!("═══════════════════════════════════════════════════════════════");
 }

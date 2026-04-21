@@ -110,11 +110,8 @@ fn run(args: RunArgs) -> Result<i32, String> {
     let heartbeats = Arc::new(Mutex::new(Vec::<Heartbeat>::new()));
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
     let socket_path = args.socket.clone();
-    let listener_handle = spawn_socket_listener(
-        socket_path.clone(),
-        Arc::clone(&heartbeats),
-        stop_rx,
-    )?;
+    let listener_handle =
+        spawn_socket_listener(socket_path.clone(), Arc::clone(&heartbeats), stop_rx)?;
 
     let mut cmd_iter = args.command.iter();
     let program = cmd_iter.next().ok_or("empty command")?;
@@ -179,8 +176,7 @@ fn run(args: RunArgs) -> Result<i32, String> {
     let signaled: Option<i32> = None;
 
     let exit_code = exit_status.code();
-    let ok = matches!(termination, TerminationReason::Completed)
-        && exit_status.success();
+    let ok = matches!(termination, TerminationReason::Completed) && exit_status.success();
 
     let hb_snapshot = heartbeats
         .lock()
@@ -200,7 +196,13 @@ fn run(args: RunArgs) -> Result<i32, String> {
         .map_err(|e| format!("failed to serialize final report: {}", e))?;
     eprintln!("ANVIL_REPORT: {}", report_line);
 
-    Ok(exit_code.unwrap_or(if signaled.is_some() { 128 + signaled.unwrap() } else { 1 }))
+    Ok(exit_code.unwrap_or_else(|| {
+        if let Some(sig) = signaled {
+            128 + sig
+        } else {
+            1
+        }
+    }))
 }
 
 fn spawn_socket_listener(
@@ -209,36 +211,34 @@ fn spawn_socket_listener(
     stop_rx: mpsc::Receiver<()>,
 ) -> Result<thread::JoinHandle<()>, String> {
     let _ = std::fs::remove_file(&path);
-    let listener = UnixListener::bind(&path)
-        .map_err(|e| format!("socket bind {:?} failed: {}", path, e))?;
+    let listener =
+        UnixListener::bind(&path).map_err(|e| format!("socket bind {:?} failed: {}", path, e))?;
     listener
         .set_nonblocking(true)
         .map_err(|e| format!("set_nonblocking: {}", e))?;
 
-    Ok(thread::spawn(move || {
-        loop {
-            if stop_rx.try_recv().is_ok() {
-                return;
-            }
-            match listener.accept() {
-                Ok((stream, _)) => {
-                    let sink = Arc::clone(&sink);
-                    thread::spawn(move || {
-                        let reader = BufReader::new(stream);
-                        for line in reader.lines().flatten() {
-                            if let Ok(hb) = serde_json::from_str::<Heartbeat>(&line) {
-                                if let Ok(mut v) = sink.lock() {
-                                    v.push(hb);
-                                }
+    Ok(thread::spawn(move || loop {
+        if stop_rx.try_recv().is_ok() {
+            return;
+        }
+        match listener.accept() {
+            Ok((stream, _)) => {
+                let sink = Arc::clone(&sink);
+                thread::spawn(move || {
+                    let reader = BufReader::new(stream);
+                    for line in reader.lines().map_while(Result::ok) {
+                        if let Ok(hb) = serde_json::from_str::<Heartbeat>(&line) {
+                            if let Ok(mut v) = sink.lock() {
+                                v.push(hb);
                             }
                         }
-                    });
-                }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(50));
-                }
-                Err(_) => return,
+                    }
+                });
             }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(_) => return,
         }
     }))
 }
@@ -247,7 +247,7 @@ fn read_rss_kb(pid: u32) -> Option<u64> {
     let content = std::fs::read_to_string(format!("/proc/{}/status", pid)).ok()?;
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("VmRSS:") {
-            let first = rest.trim().split_whitespace().next()?;
+            let first = rest.split_whitespace().next()?;
             return first.parse::<u64>().ok();
         }
     }
