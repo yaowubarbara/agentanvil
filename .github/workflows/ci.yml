@@ -100,6 +100,8 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: cargo test --release
         run: cargo test --release
+      - name: cargo build --release (bin for smoke)
+        run: cargo build --release --bin agentanvil-supervisor
       - name: Integration smoke (supervisor on real subprocess)
         run: |
           set -e
