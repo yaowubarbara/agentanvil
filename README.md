@@ -174,6 +174,31 @@ Plus `EvaluatorRegistry`: `ContainsKeywords`, `Regex`, `LengthBand`, `NoForbidde
 Five on-disk packs under `agentanvil/packs/`:
 `gsm8k-mini` (20) · `humaneval-mini` (12) · `jordan-count-mini` (6) · `swe-bench-micro` (4) · `simple-qa-mini` (10)
 
+## Benchmark: `claude-code` × `gsm8k-mini` (real run)
+
+Run via the headless Claude Code CLI on all 20 tasks of `gsm8k-mini` — real subprocess invocations, `stream-json` parsed into the v0.1 trajectory protocol, verified by the `GSM8K` strict parser, written to `traces/bench_cc_gsm8k.jsonl` (committed).
+
+| Scaffold      | Pack             | N  | Correct | Accuracy  | Avg events | Wall time | Avg / task |
+| ------------- | ---------------- | -- | ------- | --------- | ---------- | --------- | ---------- |
+| `claude-code` | `gsm8k-mini`     | 20 | 19      | **95.0%** | 4.0        | 1m 37s    | ~4.9s      |
+| `claude-code` | `humaneval-mini` | 12 | 7       | **58.3%** | 4.0        | 0m 54s    | ~4.5s      |
+
+Protocol conformance: **32/32** trajectories pass `aa validate` (zero issues).
+
+Both misses surfaced by the harness are **format-boundary issues, not model failures** — exactly what the harness is built to flag:
+
+- `gsm8k-mini/011` — gold is `4.5` (`3/4 cup × 6 batches`) but the prompt template hard-codes `#### <integer>`. Verifier correctly caught `4.0 ≠ 4.5`. Fix: widen the GSM8K parser to accept decimals, or scrub fractional items from the pack.
+- `humaneval-mini/008-012` — model returned a correct function body inside a fenced ```python block without the `def name(...):` signature; the strict verifier expected a full definition. The harness exposes the trade-off between *strict-parse verifiers* (no false positives, but brittle against scaffold formatting) and *lenient extractors* (robust, but may launder mistakes). Both have a place; the harness lets you pick per benchmark.
+
+Reproduce:
+
+```bash
+python3 -m agentanvil.cli eval run gsm8k-mini --adapter claude-code \
+    --out traces/bench_cc_gsm8k.jsonl
+python3 -m agentanvil.cli traces stats --path traces/bench_cc_gsm8k.jsonl
+python3 -m agentanvil.cli validate traces/bench_cc_gsm8k.jsonl
+```
+
 ## Tests
 
 ```

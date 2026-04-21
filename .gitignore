@@ -9,7 +9,9 @@ node_modules/
 .next/
 dist/
 build/
-traces/
+traces/*
+!traces/bench_*.jsonl
+job_applications/
 *.log
 .DS_Store
 .pytest_cache/
